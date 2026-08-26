@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>首页信封尺寸比较</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 36px; color: #302f2b; background: #f4f3ef; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; }
+    h1 { margin: 0; font-family: Georgia, serif; font-size: 32px; font-weight: 500; }
+    .lead { margin: 9px 0 28px; color: #77736a; font-size: 15px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 22px; max-width: 1020px; }
+    .choice { cursor: pointer; padding: 14px; border: 1px solid #d9d6cd; border-radius: 8px; background: #fff; transition: border-color .18s, box-shadow .18s, transform .18s; }
+    .choice:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(72, 66, 49, .12); }
+    .choice.selected { border-color: #766b4d; box-shadow: 0 0 0 2px #766b4d; }
+    .phone { position: relative; width: min(100%, 253px); aspect-ratio: 506 / 1024; margin: auto; overflow: hidden; border-radius: 5px; background: url("/files/p1.png") center / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(255,255,255,.3); }
+    .envelope { position: absolute; left: 50%; top: 50%; height: auto; filter: drop-shadow(0 10px 12px rgba(50, 42, 29, .2)); transform: translate(-50%, -50%); }
+    .small { width: 58%; }
+    .balanced { width: 70%; }
+    .large { width: 82%; }
+    .meta { padding: 14px 2px 2px; }
+    .meta strong { display: block; margin-bottom: 5px; font-family: Georgia, serif; font-size: 19px; font-weight: 500; }
+    .meta span { color: #7c786f; font-size: 13px; line-height: 1.55; }
+    .badge { display: inline-block; margin-left: 6px; padding: 2px 6px; color: #fff; font-family: -apple-system, sans-serif; font-size: 10px; vertical-align: 2px; background: #766b4d; }
+    .note { max-width: 1020px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #dad7ce; color: #77736a; font-size: 13px; }
+    @media (max-width: 780px) { body { padding: 22px 16px; } .grid { grid-template-columns: 1fr; } .choice { display: grid; grid-template-columns: 150px 1fr; gap: 14px; } .phone { width: 150px; } }
+  </style>
+</head>
+<body>
+  <h1>信封在首屏中的视觉占比</h1>
+  <p class="lead">三种方案均以视口中心定位；点击选择。信封内容仅用于尺寸预览，最终会替换成去除棋盘格后的 P2。</p>
+  <main class="grid">
+    <article class="choice" data-choice="a" onclick="toggleSelect(this)">
+      <div class="phone"><img class="envelope small" src="/files/envelope-preview.png" alt="小尺寸信封"></div>
+      <div class="meta"><strong>A · 留白感</strong><span>宽度约 58vw，画面更安静，背景成为主角，但信封在小屏上略显弱。</span></div>
+    </article>
+    <article class="choice" data-choice="b" onclick="toggleSelect(this)">
+      <div class="phone"><img class="envelope balanced" src="/files/envelope-preview.png" alt="中等尺寸信封"></div>
+      <div class="meta"><strong>B · 平衡 <i class="badge">推荐</i></strong><span>宽度约 70vw，信封清晰、背景仍有呼吸感，并为不同屏宽保留安全边距。</span></div>
+    </article>
+    <article class="choice" data-choice="c" onclick="toggleSelect(this)">
+      <div class="phone"><img class="envelope large" src="/files/envelope-preview.png" alt="大尺寸信封"></div>
+      <div class="meta"><strong>C · 主体突出</strong><span>宽度约 82vw，首屏冲击最强，但窄屏下花边更接近两侧边缘。</span></div>
+    </article>
+  </main>
+  <p class="note">推荐 B：与 P1 的柔焦背景形成明确层次，也不会让信封压满画面。</p>
+</body>
+</html>
