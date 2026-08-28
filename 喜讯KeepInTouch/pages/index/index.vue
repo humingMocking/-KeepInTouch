@@ -63,13 +63,15 @@
 						<image class="rule-angel" src="/static/icon/angel.png" mode="aspectFit" /><text
 							class="venue-label">仪式: </text>
 						<view class="venue-link venue-link-with-icon" @tap.stop="openVenueLocation('ceremony')"><text
-								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>山行有约庄园</text></view><text class="venue-time">2026年10月28日 14:28</text>
+								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>山行有约庄园</text></view>
+						<text class="venue-time">2026年10月28日 14:28</text>
 					</view>
 					<view class="rule-row venue-row">
 						<image class="rule-table" src="/static/icon/table.png" mode="scaleToFill" /><text
 							class="venue-label">晚宴: </text>
 						<view class="venue-link venue-link-with-icon" @tap.stop="openVenueLocation('dinner')"><text
-								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>城投景澜酒店</text></view><text class="venue-time">2026年10月28日 17:38</text>
+								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>城投景澜酒店</text></view>
+						<text class="venue-time">2026年10月28日 17:38</text>
 					</view>
 
 					<text class="script-heading align-left process-title">Wedding Process</text>
@@ -106,30 +108,15 @@
 					<view class="tips">
 						<text>1. 如果你身在不同的城市或因繁忙的工作无法到达现场没有关系，我们已经收到祝福～</text>
 						<text>2. 如果你有时间，请准备好你的好心情和好胃口，开开心心地来赴约吧～</text>
-						<text>3. 婚礼有专业的摄影，欢迎大家积极与我们合影哦～</text>
+						<text>3. 婚礼设有PhotoBooth，欢迎大家积极与我们合影哦～</text>
 					</view>
 					<image class="party-illustration" src="/static/icon/party.png" mode="widthFix" />
 					<view class="closing">
 						<text>愿您永远被爱和快乐包围</text>
 						<text>好久不见 我们婚礼见</text>
 					</view>
-					<button class="album-button" @tap="openAlbum">打开相册</button>
+					<!-- <button class="album-button" @tap="openAlbum">打开相册</button> -->
 				</view>
-			</view>
-		</view>
-		<view v-if="showProfilePrompt" class="profile-mask" @tap="closeProfilePrompt">
-			<view class="profile-sheet" @tap.stop>
-				<text class="profile-kicker">Wedding Guest</text>
-				<!-- <text class="profile-title">留下你的名字</text> -->
-				<button class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-					<image v-if="avatarUrl" class="avatar-image" :src="avatarUrl" mode="aspectFill" />
-					<text v-else class="avatar-placeholder">授权头像</text>
-				</button>
-				<input class="nickname-input" type="nickname" :value="nickname" placeholder="请授权昵称" confirm-type="done"
-					@input="onNicknameInput" />
-				<text v-if="profileError" class="profile-error">{{ profileError }}</text>
-				<button class="profile-confirm" :loading="profileRequesting" :disabled="profileRequesting"
-					@tap="confirmProfile">开启请柬</button>
 			</view>
 		</view>
 	</view>
@@ -149,25 +136,28 @@
 	import {
 		useBackgroundAudio
 	} from '../../src/composables/useBackgroundAudio'
-	import {
-		cacheVisitorProfile,
-		getCachedVisitorProfile,
-		recordInvitationShow
-	} from '../../src/services/visitor'
 
-	const getInvitationShareConfig = () => ({
-		...invitationConfig.share
-	})
+
+	const getInvitationShareQuery = () => {
+		const [, query = ''] = invitationConfig.share.path.split('?')
+		return query
+	}
+
+	const getInvitationTimelineShareMessage = () => {
+		const shareMessage = {
+			title: invitationConfig.share.title,
+			query: getInvitationShareQuery(),
+			imageUrl: invitationConfig.share.imageUrl
+		}
+
+		console.log('[share:timeline]', shareMessage)
+		return shareMessage
+	}
 
 	export default {
 		setup() {
 			const opened = ref(false)
 			const opening = ref(false)
-			const showProfilePrompt = ref(false)
-			const profileError = ref('')
-			const profileRequesting = ref(false)
-			const avatarUrl = ref('')
-			const nickname = ref('')
 			const {
 				playing,
 				toggle,
@@ -198,63 +188,10 @@
 				})
 			}
 
-			const closeProfilePrompt = () => {
-				if (profileRequesting.value) return
-				showProfilePrompt.value = false
-				profileError.value = ''
-			}
-
-			const onChooseAvatar = (event) => {
-				avatarUrl.value = (event.detail && event.detail.avatarUrl) || ''
-				profileError.value = ''
-			}
-
-			const onNicknameInput = (event) => {
-				nickname.value = (event.detail && event.detail.value) || ''
-				profileError.value = ''
-			}
-
-			const compressAvatarFile = (filePath) => new Promise((resolve) => {
-				if (typeof wx === 'undefined' || typeof wx.compressImage !== 'function') {
-					resolve(filePath)
-					return
-				}
-
-				wx.compressImage({
-					src: filePath,
-					quality: 72,
-					success: ({
-						tempFilePath
-					}) => resolve(tempFilePath || filePath),
-					fail: () => resolve(filePath)
-				})
-			})
-
-			const readAvatarAsDataUrl = async (source) => {
-				const filePath = String(source || '').trim()
-				if (!filePath) throw new Error('Missing avatar file.')
-				if (filePath.startsWith('data:image/')) return filePath
-
-				const compressedPath = await compressAvatarFile(filePath)
-				if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') {
-					return compressedPath
-				}
-
-				return new Promise((resolve, reject) => {
-					wx.getFileSystemManager().readFile({
-						filePath: compressedPath,
-						encoding: 'base64',
-						success: ({
-							data
-						}) => resolve(`data:image/jpeg;base64,${data}`),
-						fail: reject
-					})
-				})
-			}
-
 			const enableWechatShareMenu = () => {
 				if (typeof wx === 'undefined' || typeof wx.showShareMenu !== 'function') return
 				wx.showShareMenu({
+					withShareTicket: true,
 					menus: ['shareAppMessage', 'shareTimeline'],
 					fail: () => {}
 				})
@@ -349,15 +286,8 @@
 				})
 			}
 
-			const openInvitation = (profile) => {
+			const openInvitation = () => {
 				opening.value = true
-				showProfilePrompt.value = false
-				setTimeout(() => {
-					recordInvitationShow({
-						page: 'invitation',
-						profile
-					}).catch(() => {})
-				}, 0)
 				setTimeout(() => {
 					opened.value = true
 					opening.value = false
@@ -365,42 +295,8 @@
 			}
 
 			const requestOpen = async () => {
-				if (opening.value || profileRequesting.value) return
-
-				const cachedProfile = getCachedVisitorProfile()
-				if (cachedProfile) {
-					openInvitation(cachedProfile)
-					return
-				}
-
-				profileError.value = ''
-				showProfilePrompt.value = true
-			}
-
-			const confirmProfile = async () => {
-				if (profileRequesting.value) return
-
-				const trimmedNickname = nickname.value.trim()
-				const trimmedAvatarUrl = avatarUrl.value.trim()
-				if (!trimmedAvatarUrl || !trimmedNickname || trimmedNickname === '微信用户') {
-					profileError.value = '请选择头像并填写你的昵称'
-					return
-				}
-
-				profileRequesting.value = true
-				try {
-					const avatarDataUrl = await readAvatarAsDataUrl(trimmedAvatarUrl)
-					const profile = await cacheVisitorProfile({
-						nickname: trimmedNickname,
-						avatarUrl: avatarDataUrl
-					})
-					openInvitation(profile)
-				} catch (error) {
-					profileError.value = '资料保存失败，请重试'
-					showToast('资料保存失败，请重试')
-				} finally {
-					profileRequesting.value = false
-				}
+				if (opening.value) return
+				openInvitation()
 			}
 
 			onShow(() => {
@@ -412,35 +308,25 @@
 			return {
 				opened,
 				opening,
-				showProfilePrompt,
-				profileError,
-				profileRequesting,
-				avatarUrl,
-				nickname,
 				playing,
 				requestOpen,
-				closeProfilePrompt,
-				onChooseAvatar,
-				onNicknameInput,
-				confirmProfile,
 				openVenueLocation,
 				toggleAudio: toggle,
 				openAlbum
 			}
 		},
-		onShareAppMessage() {
-			const shareConfig = getInvitationShareConfig()
-			console.log('[share:app-message]', shareConfig)
-			return shareConfig
+		onShareAppMessage(res) {
+			const shareMessage = {
+				title: '囍|我们结婚啦',
+				path: '/pages/index/index?share=wechat&v=20260828',
+				imageUrl: '/static/invitation/share-card.jpg'
+			}
+
+			console.log('[share:app-message]', res && res.from, shareMessage)
+			return shareMessage
 		},
 		onShareTimeline() {
-			const shareConfig = getInvitationShareConfig()
-			console.log('[share:timeline]', shareConfig)
-			return {
-				title: shareConfig.title,
-				query: '',
-				imageUrl: shareConfig.imageUrl
-			}
+			return getInvitationTimelineShareMessage()
 		}
 	}
 </script>
@@ -549,114 +435,6 @@
 		font-size: 28rpx;
 	}
 
-	.profile-mask {
-		position: fixed;
-		z-index: 20;
-		top: 0;
-		right: 0;
-		bottom: 0;
-		left: 0;
-		display: flex;
-		align-items: flex-end;
-		background: rgba(39, 32, 25, .46);
-	}
-
-	.profile-sheet {
-		width: 100%;
-		padding: 48rpx 56rpx 58rpx;
-		box-sizing: border-box;
-		border-radius: 16rpx 16rpx 0 0;
-		background: #fffaf2;
-		box-shadow: 0 -18rpx 44rpx rgba(54, 47, 36, .22);
-		text-align: center;
-	}
-
-	.profile-kicker {
-		display: block;
-		color: #9f3f53;
-		font-family: 'KeepInTouch IBM Plex Serif', serif;
-		font-size: 24rpx;
-		font-weight: 700;
-		letter-spacing: 1rpx;
-	}
-
-	.profile-title {
-		display: block;
-		margin-top: 12rpx;
-		color: #292722;
-		font-size: 38rpx;
-		font-weight: 400;
-		letter-spacing: 4rpx;
-	}
-
-	.avatar-button {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 132rpx;
-		height: 132rpx;
-		margin: 34rpx auto 24rpx;
-		padding: 0;
-		overflow: hidden;
-		border-radius: 50%;
-		border: 1rpx solid rgba(159, 63, 83, .28);
-		color: #9f3f53;
-		background: #f4ead7;
-		line-height: 1;
-	}
-
-	.avatar-button::after,
-	.profile-confirm::after {
-		border: 0;
-	}
-
-	.avatar-image {
-		display: block;
-		width: 100%;
-		height: 100%;
-	}
-
-	.avatar-placeholder {
-		color: #9f3f53;
-		font-size: 25rpx;
-		font-weight: 300;
-		letter-spacing: 2rpx;
-	}
-
-	.nickname-input {
-		width: 100%;
-		height: 84rpx;
-		margin: 0 auto;
-		border-bottom: 1rpx solid rgba(159, 63, 83, .32);
-		color: #292722;
-		font-size: 31rpx;
-		font-weight: 300;
-		line-height: 84rpx;
-		text-align: center;
-	}
-
-	.profile-error {
-		display: block;
-		min-height: 34rpx;
-		margin-top: 18rpx;
-		color: #9f3f53;
-		font-size: 24rpx;
-		line-height: 34rpx;
-	}
-
-	.profile-confirm {
-		width: 100%;
-		height: 82rpx;
-		margin-top: 26rpx;
-		border-radius: 8rpx;
-		color: #fffaf2;
-		font-size: 29rpx;
-		font-weight: 400;
-		line-height: 82rpx;
-		letter-spacing: 4rpx;
-		background: #9f3f53;
-	}
-
 	.heart-icon {
 		display: block;
 		width: 1em;
@@ -667,7 +445,7 @@
 		position: relative;
 		min-height: 100vh;
 		background: #f3ead7;
-		padding:0;
+		padding: 0;
 		box-sizing: border-box;
 	}
 

@@ -3,7 +3,9 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "请柬"
+				"navigationBarTitleText": "请柬",
+				"enableShareAppMessage": true,
+				"enableShareTimeline": true
 			}
 		},
 		{

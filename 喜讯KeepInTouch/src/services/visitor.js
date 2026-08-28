@@ -70,9 +70,7 @@ export async function trackVisit(payload = {}) {
   const events = Array.isArray(storedEvents) ? storedEvents : []
   setStorageValue(EVENT_STORAGE_KEY, [...events, event].slice(-100))
 
-  if (payload.useCloud !== false && typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.callFunction === 'function') {
-    return wx.cloud.callFunction({ name: 'trackVisit', data: event })
-  }
+  // 云端上报先停用，保留本地记录以便后续恢复。
   return { local: true, event }
 }
 
