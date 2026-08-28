@@ -16,9 +16,15 @@
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "assets-source"
+      }
+    ],
     "include": []
   },
   "appid": "wx896545da7bc8f0a3",
+  "cloudfunctionRoot": "../../../../cloudfunctions/",
   "editorSetting": {}
 }

@@ -13,6 +13,7 @@
 			}
 		}
 	],
+	"lazyCodeLoading": "requiredComponents",
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "婚礼请柬",

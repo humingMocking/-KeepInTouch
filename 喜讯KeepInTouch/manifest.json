@@ -41,7 +41,9 @@
                 ]
             },
             /* ios打包配置 */
-            "ios" : {},
+            "ios" : {
+                "urlschemewhitelist" : "iosamap,baidumap,qqmap"
+            },
             /* SDK配置 */
             "sdkConfigs" : {}
         }
@@ -51,6 +53,8 @@
     /* 小程序特有相关 */
     "mp-weixin" : {
         "appid" : "wx896545da7bc8f0a3",
+        "cloudfunctionRoot" : "../../../../cloudfunctions/",
+        "lazyCodeLoading" : "requiredComponents",
         "setting" : {
             "urlCheck" : false
         },

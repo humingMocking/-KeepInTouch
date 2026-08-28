@@ -3,7 +3,7 @@
 		onLaunch: function() {
 			console.log('App Launch')
 			if (typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.init === 'function') {
-				wx.cloud.init({ env: 'cloud1', traceUser: true })
+				wx.cloud.init({ env: 'cloud1-d9gdvstwydd9ec9b9', traceUser: true })
 			}
 		},
 		onShow: function() {
@@ -16,5 +16,5 @@
 </script>
 
 <style>
-	/*每个页面公共css */
+	@import url('./src/styles/fonts.css');
 </style>
