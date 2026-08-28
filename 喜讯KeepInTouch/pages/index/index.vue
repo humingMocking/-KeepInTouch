@@ -28,13 +28,13 @@
 						<text class="script-heading">Welcome to our wedding</text>
 						<view class="intro-copy">
 							<text>嗨～</text>
-							<text>当你看到这篇文章时</text>
+							<text>当你看到这封请柬时</text>
 							<text>我们的婚礼筹备已经接近尾声了</text>
-							<text class="copy-gap">这是一封也许询问平安</text>
-							<text>但承载着我们满腔诚挚的婚礼邀请</text>
+							<text class="copy-gap">这是一封也许词句平实</text>
+							<text>但承载着我们满腔诚挚欢迎的婚礼邀请</text>
 							<text>想把“我们”说与你听</text>
 						</view>
-						<view class="names"><text>胡铭</text>
+						<view class="names"><text>胡 铭</text>
 							<image class="heart-icon name-heart" src="/static/icon/heart.svg" mode="aspectFit" />
 							<text>翁露婷</text>
 						</view>
@@ -120,12 +120,12 @@
 		<view v-if="showProfilePrompt" class="profile-mask" @tap="closeProfilePrompt">
 			<view class="profile-sheet" @tap.stop>
 				<text class="profile-kicker">Wedding Guest</text>
-				<text class="profile-title">留下你的名字</text>
+				<!-- <text class="profile-title">留下你的名字</text> -->
 				<button class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
 					<image v-if="avatarUrl" class="avatar-image" :src="avatarUrl" mode="aspectFill" />
-					<text v-else class="avatar-placeholder">头像</text>
+					<text v-else class="avatar-placeholder">授权头像</text>
 				</button>
-				<input class="nickname-input" type="nickname" :value="nickname" placeholder="请输入昵称" confirm-type="done"
+				<input class="nickname-input" type="nickname" :value="nickname" placeholder="请授权昵称" confirm-type="done"
 					@input="onNicknameInput" />
 				<text v-if="profileError" class="profile-error">{{ profileError }}</text>
 				<button class="profile-confirm" :loading="profileRequesting" :disabled="profileRequesting"
@@ -140,8 +140,6 @@
 		ref
 	} from 'vue'
 	import {
-		onShareAppMessage,
-		onShareTimeline,
 		onShow,
 		onUnload
 	} from '@dcloudio/uni-app'
@@ -405,8 +403,6 @@
 				}
 			}
 
-			onShareAppMessage(getInvitationShareConfig)
-			onShareTimeline(getInvitationShareConfig)
 			onShow(() => {
 				enableWechatShareMenu()
 			})
@@ -432,8 +428,20 @@
 				openAlbum
 			}
 		},
-		onShareAppMessage: getInvitationShareConfig,
-		onShareTimeline: getInvitationShareConfig
+		onShareAppMessage() {
+			const shareConfig = getInvitationShareConfig()
+			console.log('[share:app-message]', shareConfig)
+			return shareConfig
+		},
+		onShareTimeline() {
+			const shareConfig = getInvitationShareConfig()
+			console.log('[share:timeline]', shareConfig)
+			return {
+				title: shareConfig.title,
+				query: '',
+				imageUrl: shareConfig.imageUrl
+			}
+		}
 	}
 </script>
 

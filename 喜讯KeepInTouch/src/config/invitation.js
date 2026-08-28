@@ -1,5 +1,5 @@
 export const invitationConfig = {
-  share: { title: '囍|我们结婚啦', path: '/pages/index/index', imageUrl: '/static/invitation/share.jpg' },
+  share: { title: '囍|我们结婚啦', path: '/pages/index/index', imageUrl: '/static/invitation/share-card.jpg' },
   audio: { src: '', title: '婚礼请柬背景音乐' },
   album: { title: '我们的相册', items: [] },
   venues: {

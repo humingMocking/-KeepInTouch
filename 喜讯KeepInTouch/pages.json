@@ -3,7 +3,7 @@
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "婚礼请柬"
+				"navigationBarTitleText": "请柬"
 			}
 		},
 		{
@@ -16,7 +16,7 @@
 	"lazyCodeLoading": "requiredComponents",
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "婚礼请柬",
+		"navigationBarTitleText": "请柬",
 		"navigationBarBackgroundColor": "#F8F8F8",
 		"backgroundColor": "#F8F8F8"
 	},
