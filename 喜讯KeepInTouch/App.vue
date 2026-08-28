@@ -17,4 +17,5 @@
 
 <style>
 	@import url('./src/styles/fonts.css');
+	@import url('./src/styles/iconfont.css');
 </style>
