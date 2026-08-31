@@ -16,7 +16,6 @@
 						<view class="photo-skeleton" :class="{ hidden: isImageLoaded(photo.id) }"></view>
 						<image class="album-photo" :class="{ loaded: isImageLoaded(photo.id) }" :src="photo.src"
 							mode="aspectFill" lazy-load @load="markImageLoaded(photo.id)" />
-						<text class="photo-number">{{ formatPhotoNumber(photo.index) }}</text>
 					</view>
 				</view>
 				<view class="album-column album-column-right">

@@ -118,7 +118,7 @@
 						<text>好久不见 我们婚礼见</text>
 					</view>
 					<view class="album-button" hover-class="album-button-pressed" hover-stay-time="80" @tap="openAlbum">
-						<image class="album-button-icon" src="/static/icon/candle.png" mode="aspectFit" />
+						<image class="album-button-icon" src="/static/icon/kissing.png" />
 						<text class="album-button-text">查看相册</text>
 						<text class="album-button-arrow">›</text>
 					</view>
@@ -197,13 +197,15 @@
 				destroy
 			} = useBackgroundAudio(invitationConfig.audio)
 			const invitationPhotoUrl = invitationConfig.album.cover || '/static/invitation/wedding-photo.jpg'
-			const openAlbumPage = (profile) => {
-				showProfilePrompt.value = false
+			const trackAlbumVisit = (profile) => {
 				void recordInvitationShow({
 					page: 'album',
 					scene: 'album-button',
 					profile
 				}).catch(() => {})
+			}
+			const openAlbumPage = () => {
+				showProfilePrompt.value = false
 				uni.navigateTo({
 					url: '/pages/album/album'
 				})
@@ -212,7 +214,10 @@
 				if (profileRequesting.value) return
 				const cachedProfile = getCachedVisitorProfile()
 				if (cachedProfile) {
-					openAlbumPage(cachedProfile)
+					openAlbumPage()
+					setTimeout(() => {
+						trackAlbumVisit(cachedProfile)
+					}, 0)
 					return
 				}
 
@@ -309,6 +314,19 @@
 						fail: reject
 					})
 				})
+			}
+
+			const persistAuthorizedProfile = async (profile) => {
+				try {
+					const avatarDataUrl = await readAvatarAsDataUrl(profile.avatarUrl)
+					return await cacheVisitorProfile({
+						nickname: profile.nickname,
+						avatarUrl: avatarDataUrl
+					})
+				} catch (error) {
+					console.warn('[confirmProfile] avatar persistence failed, falling back to raw path', error)
+					return cacheVisitorProfile(profile)
+				}
 			}
 
 			const enableWechatShareMenu = () => {
@@ -417,7 +435,7 @@
 				}, 650)
 			}
 
-			const confirmProfile = async () => {
+			const confirmProfile = () => {
 				if (profileRequesting.value) return
 
 				const trimmedNickname = nickname.value.trim()
@@ -428,19 +446,24 @@
 				}
 
 				profileRequesting.value = true
-				try {
-					const avatarDataUrl = await readAvatarAsDataUrl(trimmedAvatarUrl)
-					const profile = await cacheVisitorProfile({
-						nickname: trimmedNickname,
-						avatarUrl: avatarDataUrl
-					})
-					openAlbumPage(profile)
-				} catch (error) {
-					profileError.value = '资料保存失败，请重试'
-					showToast('资料保存失败，请重试')
-				} finally {
-					profileRequesting.value = false
+				const profile = {
+					nickname: trimmedNickname,
+					avatarUrl: trimmedAvatarUrl
 				}
+				openAlbumPage()
+				setTimeout(() => {
+					void persistAuthorizedProfile(profile)
+						.then((cachedProfile) => {
+							trackAlbumVisit(cachedProfile)
+						})
+						.catch((error) => {
+							console.warn('[confirmProfile] background profile persistence failed', error)
+							trackAlbumVisit(profile)
+						})
+						.finally(() => {
+							profileRequesting.value = false
+						})
+				}, 0)
 			}
 
 			const requestOpen = async () => {
@@ -1290,10 +1313,10 @@
 	
 
 	.album-button-icon {
-		flex: 0 0 34rpx;
-		width: 34rpx;
-		height: 34rpx;
-		opacity: .84;
+		flex: 0 0 62rpx;
+		width: 62rpx;
+		height: 62rpx;
+
 	}
 
 	.album-button-text {
@@ -1303,6 +1326,7 @@
 		font-weight: 400;
 		letter-spacing: 3rpx;
 		line-height: 1;
+		margin-left: -14rpx;
 	}
 
 	.album-button-arrow {

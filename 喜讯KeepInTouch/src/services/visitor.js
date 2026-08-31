@@ -72,7 +72,13 @@ export async function trackVisit(payload = {}) {
 
   if (payload.useCloud !== false && typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.callFunction === 'function') {
     try {
-      return await wx.cloud.callFunction({ name: 'trackVisit', data: event })
+      const request = wx.cloud.callFunction({ name: 'trackVisit', data: event })
+      if (request && typeof request.catch === 'function') {
+        request.catch((error) => {
+          console.warn('[trackVisit] cloud function failed, falling back to local record', error)
+        })
+      }
+      return { queued: true, event }
     } catch (error) {
       console.warn('[trackVisit] cloud function failed, falling back to local record', error)
     }
