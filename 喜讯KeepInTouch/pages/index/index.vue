@@ -20,8 +20,10 @@
 						<text class="english-heading">Wedding Invitation</text>
 						<text class="section-heading">婚礼邀请函</text>
 					</view>
-					<view class="photo-frame">
+					<view class="photo-frame" hover-class="photo-frame-pressed" hover-stay-time="80"
+						@tap.stop="previewInvitationPhoto">
 						<image class="wedding-photo" src="/static/invitation/wedding-photo.jpg" mode="aspectFill" />
+
 						<text class="photo-hi">Hi</text>
 					</view>
 					<view class="intro-message">
@@ -115,8 +117,26 @@
 						<text>愿您永远被爱和快乐包围</text>
 						<text>好久不见 我们婚礼见</text>
 					</view>
-					<!-- <button class="album-button" @tap="openAlbum">打开相册</button> -->
+					<view class="album-button" hover-class="album-button-pressed" hover-stay-time="80" @tap="openAlbum">
+						<image class="album-button-icon" src="/static/icon/candle.png" mode="aspectFit" />
+						<text class="album-button-text">查看相册</text>
+						<text class="album-button-arrow">›</text>
+					</view>
 				</view>
+			</view>
+		</view>
+		<view v-if="showProfilePrompt" class="profile-mask" @tap="closeProfilePrompt">
+			<view class="profile-sheet" @tap.stop>
+				<text class="profile-kicker">Wedding Guest</text>
+				<button class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
+					<image v-if="avatarUrl" class="avatar-image" :src="avatarUrl" mode="aspectFill" />
+					<text v-else class="avatar-placeholder">授权头像</text>
+				</button>
+				<input class="nickname-input" type="nickname" :value="nickname" placeholder="请授权昵称" confirm-type="done"
+					@input="onNicknameInput" />
+				<text v-if="profileError" class="profile-error">{{ profileError }}</text>
+				<button class="profile-confirm" :loading="profileRequesting" :disabled="profileRequesting"
+					@tap="confirmProfile">开启相册</button>
 			</view>
 		</view>
 	</view>
@@ -133,6 +153,14 @@
 	import {
 		invitationConfig
 	} from '../../src/config/invitation'
+	import {
+		resolvePreviewImageSrc
+	} from '../../src/utils/previewImage'
+	import {
+		cacheVisitorProfile,
+		getCachedVisitorProfile,
+		recordInvitationShow
+	} from '../../src/services/visitor'
 	import {
 		useBackgroundAudio
 	} from '../../src/composables/useBackgroundAudio'
@@ -158,14 +186,41 @@
 		setup() {
 			const opened = ref(false)
 			const opening = ref(false)
+			const showProfilePrompt = ref(false)
+			const profileError = ref('')
+			const profileRequesting = ref(false)
+			const avatarUrl = ref('')
+			const nickname = ref('')
 			const {
 				playing,
 				toggle,
 				destroy
 			} = useBackgroundAudio(invitationConfig.audio)
-			const openAlbum = () => uni.navigateTo({
-				url: '/pages/album/album'
-			})
+			const invitationPhotoUrl = invitationConfig.album.cover || '/static/invitation/wedding-photo.jpg'
+			const openAlbumPage = (profile) => {
+				showProfilePrompt.value = false
+				void recordInvitationShow({
+					page: 'album',
+					scene: 'album-button',
+					profile
+				}).catch(() => {})
+				uni.navigateTo({
+					url: '/pages/album/album'
+				})
+			}
+			const openAlbum = () => {
+				if (profileRequesting.value) return
+				const cachedProfile = getCachedVisitorProfile()
+				if (cachedProfile) {
+					openAlbumPage(cachedProfile)
+					return
+				}
+
+				profileError.value = ''
+				avatarUrl.value = ''
+				nickname.value = ''
+				showProfilePrompt.value = true
+			}
 			const mapProviders = [{
 					key: 'amap',
 					label: '高德地图'
@@ -185,6 +240,74 @@
 				uni.showToast({
 					title,
 					icon: 'none'
+				})
+			}
+
+			const previewInvitationPhoto = async () => {
+				if (typeof uni === 'undefined' || typeof uni.previewImage !== 'function') {
+					showToast('当前环境无法预览图片')
+					return
+				}
+
+				const resolvedInvitationPhotoUrl = await resolvePreviewImageSrc(invitationPhotoUrl)
+				uni.previewImage({
+					current: resolvedInvitationPhotoUrl,
+					urls: [resolvedInvitationPhotoUrl],
+					fail: () => showToast('图片预览失败，请重试')
+				})
+			}
+
+			const closeProfilePrompt = () => {
+				if (profileRequesting.value) return
+				showProfilePrompt.value = false
+				profileError.value = ''
+			}
+
+			const onChooseAvatar = (event) => {
+				avatarUrl.value = (event.detail && event.detail.avatarUrl) || ''
+				profileError.value = ''
+			}
+
+			const onNicknameInput = (event) => {
+				nickname.value = (event.detail && event.detail.value) || ''
+				profileError.value = ''
+			}
+
+			const compressAvatarFile = (filePath) => new Promise((resolve) => {
+				if (typeof wx === 'undefined' || typeof wx.compressImage !== 'function') {
+					resolve(filePath)
+					return
+				}
+
+				wx.compressImage({
+					src: filePath,
+					quality: 72,
+					success: ({
+						tempFilePath
+					}) => resolve(tempFilePath || filePath),
+					fail: () => resolve(filePath)
+				})
+			})
+
+			const readAvatarAsDataUrl = async (source) => {
+				const filePath = String(source || '').trim()
+				if (!filePath) throw new Error('Missing avatar file.')
+				if (filePath.startsWith('data:image/')) return filePath
+
+				const compressedPath = await compressAvatarFile(filePath)
+				if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') {
+					return compressedPath
+				}
+
+				return new Promise((resolve, reject) => {
+					wx.getFileSystemManager().readFile({
+						filePath: compressedPath,
+						encoding: 'base64',
+						success: ({
+							data
+						}) => resolve(`data:image/jpeg;base64,${data}`),
+						fail: reject
+					})
 				})
 			}
 
@@ -294,6 +417,32 @@
 				}, 650)
 			}
 
+			const confirmProfile = async () => {
+				if (profileRequesting.value) return
+
+				const trimmedNickname = nickname.value.trim()
+				const trimmedAvatarUrl = avatarUrl.value.trim()
+				if (!trimmedAvatarUrl || !trimmedNickname || trimmedNickname === '微信用户') {
+					profileError.value = '请选择头像并填写你的昵称'
+					return
+				}
+
+				profileRequesting.value = true
+				try {
+					const avatarDataUrl = await readAvatarAsDataUrl(trimmedAvatarUrl)
+					const profile = await cacheVisitorProfile({
+						nickname: trimmedNickname,
+						avatarUrl: avatarDataUrl
+					})
+					openAlbumPage(profile)
+				} catch (error) {
+					profileError.value = '资料保存失败，请重试'
+					showToast('资料保存失败，请重试')
+				} finally {
+					profileRequesting.value = false
+				}
+			}
+
 			const requestOpen = async () => {
 				if (opening.value) return
 				openInvitation()
@@ -310,6 +459,16 @@
 				opening,
 				playing,
 				requestOpen,
+				previewInvitationPhoto,
+				showProfilePrompt,
+				profileError,
+				profileRequesting,
+				avatarUrl,
+				nickname,
+				closeProfilePrompt,
+				onChooseAvatar,
+				onNicknameInput,
+				confirmProfile,
 				openVenueLocation,
 				toggleAudio: toggle,
 				openAlbum
@@ -435,6 +594,114 @@
 		font-size: 28rpx;
 	}
 
+	.profile-mask {
+		position: fixed;
+		z-index: 20;
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+		display: flex;
+		align-items: flex-end;
+		background: rgba(39, 32, 25, .46);
+	}
+
+	.profile-sheet {
+		width: 100%;
+		padding: 48rpx 56rpx 58rpx;
+		box-sizing: border-box;
+		border-radius: 16rpx 16rpx 0 0;
+		background: #fffaf2;
+		box-shadow: 0 -18rpx 44rpx rgba(54, 47, 36, .22);
+		text-align: center;
+	}
+
+	.profile-kicker {
+		display: block;
+		color: #9f3f53;
+		font-family: 'KeepInTouch IBM Plex Serif', serif;
+		font-size: 24rpx;
+		font-weight: 700;
+		letter-spacing: 1rpx;
+	}
+
+	.profile-title {
+		display: block;
+		margin-top: 12rpx;
+		color: #292722;
+		font-size: 38rpx;
+		font-weight: 400;
+		letter-spacing: 4rpx;
+	}
+
+	.avatar-button {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 132rpx;
+		height: 132rpx;
+		margin: 34rpx auto 24rpx;
+		padding: 0;
+		overflow: hidden;
+		border-radius: 50%;
+		border: 1rpx solid rgba(159, 63, 83, .28);
+		color: #9f3f53;
+		background: #f4ead7;
+		line-height: 1;
+	}
+
+	.avatar-button::after,
+	.profile-confirm::after {
+		border: 0;
+	}
+
+	.avatar-image {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	.avatar-placeholder {
+		color: #9f3f53;
+		font-size: 25rpx;
+		font-weight: 300;
+		letter-spacing: 2rpx;
+	}
+
+	.nickname-input {
+		width: 100%;
+		height: 84rpx;
+		margin: 0 auto;
+		border-bottom: 1rpx solid rgba(159, 63, 83, .32);
+		color: #292722;
+		font-size: 31rpx;
+		font-weight: 300;
+		line-height: 84rpx;
+		text-align: center;
+	}
+
+	.profile-error {
+		display: block;
+		min-height: 34rpx;
+		margin-top: 18rpx;
+		color: #9f3f53;
+		font-size: 24rpx;
+		line-height: 34rpx;
+	}
+
+	.profile-confirm {
+		width: 100%;
+		height: 82rpx;
+		margin-top: 26rpx;
+		border-radius: 8rpx;
+		color: #fffaf2;
+		font-size: 29rpx;
+		font-weight: 400;
+		line-height: 82rpx;
+		letter-spacing: 4rpx;
+		background: #9f3f53;
+	}
+
 	.heart-icon {
 		display: block;
 		width: 1em;
@@ -521,12 +788,56 @@
 		box-sizing: border-box;
 		background: #fffdfa;
 		box-shadow: 0 10rpx 18rpx rgba(76, 67, 53, .12);
+		transition: transform .18s ease, box-shadow .18s ease;
+	}
+
+	.photo-frame-pressed {
+		transform: scale(.988);
+		box-shadow: 0 6rpx 14rpx rgba(76, 67, 53, .16);
 	}
 
 	.wedding-photo {
 		display: block;
 		width: 100%;
 		height: 100%;
+	}
+
+	.photo-preview-badge {
+		position: absolute;
+		z-index: 2;
+		right: 28rpx;
+		bottom: 36rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 54rpx;
+		height: 54rpx;
+		border: 1rpx solid rgba(255, 253, 250, .88);
+		border-radius: 50%;
+		background: rgba(159, 63, 83, .72);
+		box-shadow: 0 8rpx 18rpx rgba(52, 42, 34, .18);
+	}
+
+	.photo-preview-lens {
+		position: relative;
+		width: 22rpx;
+		height: 22rpx;
+		border: 3rpx solid #fffdfa;
+		border-radius: 50%;
+		box-sizing: border-box;
+	}
+
+	.photo-preview-lens::after {
+		content: '';
+		position: absolute;
+		right: -9rpx;
+		bottom: -7rpx;
+		width: 13rpx;
+		height: 3rpx;
+		border-radius: 999rpx;
+		background: #fffdfa;
+		transform: rotate(45deg);
+		transform-origin: left center;
 	}
 
 	.photo-hi {
@@ -966,15 +1277,40 @@
 	}
 
 	.album-button {
-		width: 250rpx;
-		height: 76rpx;
-		margin: 64rpx auto 0;
-		border: 1rpx solid #9f3f53;
-		border-radius: 0;
-		color: #9f3f53;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 14rpx;
+		width: 306rpx;
+		height: 88rpx;
+		margin: 72rpx auto 0;
+		box-sizing: border-box;
+	}
+
+	
+
+	.album-button-icon {
+		flex: 0 0 34rpx;
+		width: 34rpx;
+		height: 34rpx;
+		opacity: .84;
+	}
+
+	.album-button-text {
+		color: #8f334a;
+		font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
 		font-size: 28rpx;
-		font-weight: 300;
-		line-height: 72rpx;
-		background: transparent;
+		font-weight: 400;
+		letter-spacing: 3rpx;
+		line-height: 1;
+	}
+
+	.album-button-arrow {
+		color: #8f334a;
+		font-family: 'KeepInTouch IBM Plex Serif', serif;
+		font-size: 34rpx;
+		font-weight: 700;
+		line-height: 1;
+		transform: translateY(-1rpx);
 	}
 </style>

@@ -70,7 +70,14 @@ export async function trackVisit(payload = {}) {
   const events = Array.isArray(storedEvents) ? storedEvents : []
   setStorageValue(EVENT_STORAGE_KEY, [...events, event].slice(-100))
 
-  // 云端上报先停用，保留本地记录以便后续恢复。
+  if (payload.useCloud !== false && typeof wx !== 'undefined' && wx.cloud && typeof wx.cloud.callFunction === 'function') {
+    try {
+      return await wx.cloud.callFunction({ name: 'trackVisit', data: event })
+    } catch (error) {
+      console.warn('[trackVisit] cloud function failed, falling back to local record', error)
+    }
+  }
+
   return { local: true, event }
 }
 
