@@ -5,7 +5,7 @@
 			<view class="envelope-trigger" hover-class="envelope-pressed" hover-stay-time="80">
 				<image class="cover-envelope" src="/static/invitation/cover-envelope.png" mode="scaleToFill" />
 				<view class="cover-letter-card">
-					<image class="cover-letter-photo" src="https://gitee.com/hu-minglt/image-storage/raw/master/album/38.jpg" mode="aspectFill" />
+					<image class="cover-letter-photo" src="/static/invitation/cover-letter.jpg" mode="aspectFill" />
 				</view>
 				<image class="cover-envelope-front" src="/static/invitation/cover-envelope-front.png"
 					mode="scaleToFill" />
@@ -426,6 +426,7 @@
 				opened,
 				opening,
 				playing,
+				invitationPhotoUrl,
 				requestOpen,
 				previewInvitationPhoto,
 				showProfilePrompt,
