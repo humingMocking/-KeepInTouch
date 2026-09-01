@@ -9,9 +9,47 @@ function isAlreadyResolvableSrc(src) {
   return /^(https?:|file:|wxfile:|data:|blob:)/i.test(src)
 }
 
+function isCloudFileSrc(src) {
+  return /^cloud:\/\//i.test(src)
+}
+
+function resolveCloudFileSrc(src) {
+  const normalizedSrc = normalizeSrc(src)
+  if (!normalizedSrc) return Promise.resolve('')
+  if (resolvedSrcCache.has(normalizedSrc)) return Promise.resolve(resolvedSrcCache.get(normalizedSrc))
+  if (typeof wx === 'undefined' || !wx.cloud || typeof wx.cloud.getTempFileURL !== 'function') {
+    return Promise.resolve(normalizedSrc)
+  }
+
+  const pending = resolvingSrcCache.get(normalizedSrc)
+  if (pending) return pending
+
+  const task = new Promise((resolve) => {
+    wx.cloud.getTempFileURL({
+      fileList: [normalizedSrc],
+      success: (result) => {
+        const fileItem = result && Array.isArray(result.fileList) ? result.fileList[0] : null
+        const resolvedSrc = normalizeSrc(fileItem && fileItem.tempFileURL) || normalizedSrc
+        resolvedSrcCache.set(normalizedSrc, resolvedSrc)
+        resolvingSrcCache.delete(normalizedSrc)
+        resolve(resolvedSrc)
+      },
+      fail: () => {
+        resolvedSrcCache.set(normalizedSrc, normalizedSrc)
+        resolvingSrcCache.delete(normalizedSrc)
+        resolve(normalizedSrc)
+      }
+    })
+  })
+
+  resolvingSrcCache.set(normalizedSrc, task)
+  return task
+}
+
 export function resolvePreviewImageSrc(src) {
   const normalizedSrc = normalizeSrc(src)
   if (!normalizedSrc) return Promise.resolve('')
+  if (isCloudFileSrc(normalizedSrc)) return resolveCloudFileSrc(normalizedSrc)
   if (isAlreadyResolvableSrc(normalizedSrc)) return Promise.resolve(normalizedSrc)
   if (resolvedSrcCache.has(normalizedSrc)) return Promise.resolve(resolvedSrcCache.get(normalizedSrc))
   if (typeof uni === 'undefined' || typeof uni.getImageInfo !== 'function') {

@@ -14,7 +14,7 @@
 						:class="'photo-card-' + ((photo.index % 3) + 1)" :style="getRevealStyle(photo)"
 						hover-class="photo-card-pressed" hover-stay-time="80" @tap="previewPhoto(photo)">
 						<view class="photo-skeleton" :class="{ hidden: isImageLoaded(photo.id) }"></view>
-						<image class="album-photo" :class="{ loaded: isImageLoaded(photo.id) }" :src="photo.src"
+						<image v-if="photo.src" class="album-photo" :class="{ loaded: isImageLoaded(photo.id) }" :src="photo.src"
 							mode="aspectFill" lazy-load @load="markImageLoaded(photo.id)" />
 					</view>
 				</view>
@@ -23,7 +23,7 @@
 						:class="'photo-card-' + ((photo.index % 3) + 1)" :style="getRevealStyle(photo)"
 						hover-class="photo-card-pressed" hover-stay-time="80" @tap="previewPhoto(photo)">
 						<view class="photo-skeleton" :class="{ hidden: isImageLoaded(photo.id) }"></view>
-						<image class="album-photo" :class="{ loaded: isImageLoaded(photo.id) }" :src="photo.src"
+						<image v-if="photo.src" class="album-photo" :class="{ loaded: isImageLoaded(photo.id) }" :src="photo.src"
 							mode="aspectFill" lazy-load @load="markImageLoaded(photo.id)" />
 					</view>
 				</view>
@@ -45,6 +45,7 @@
 	<script>
 		import {
 			computed,
+			getCurrentInstance,
 			ref
 		} from 'vue'
 		import {
@@ -58,27 +59,38 @@
 		import {
 			resolvePreviewImageUrls
 		} from '../../src/utils/previewImage'
+		import {
+			cacheVisitorProfile,
+			getCachedVisitorProfile,
+			recordInvitationShow
+		} from '../../src/services/visitor'
 
 	const INITIAL_BATCH_SIZE = 10
 	const BATCH_SIZE = 8
 
 	export default {
 		setup() {
+			const instance = getCurrentInstance()
 			const loadedImageIds = ref({})
 			const isAppending = ref(false)
-			const allPhotos = invitationConfig.album.items || []
-			const previewUrls = allPhotos.map((photo) => photo.src)
+			const albumVisitTracked = ref(false)
+			const sourcePhotos = invitationConfig.album.items || []
+			const previewUrls = sourcePhotos.map((photo) => photo.src)
 			const resolvedPreviewUrls = ref([])
-			const visibleCount = ref(Math.min(INITIAL_BATCH_SIZE, allPhotos.length))
+			const resolvedPhotos = computed(() => sourcePhotos.map((photo, index) => ({
+				...photo,
+				src: resolvedPreviewUrls.value[index] || ''
+			})))
+			const visibleCount = ref(Math.min(INITIAL_BATCH_SIZE, sourcePhotos.length))
 			let loadingTimer = null
 
 			const formatPhotoNumber = (index) => index < 10 ? `0${index}` : String(index)
-			const visiblePhotos = computed(() => allPhotos.slice(0, visibleCount.value))
+			const visiblePhotos = computed(() => resolvedPhotos.value.slice(0, visibleCount.value))
 			const leftPhotos = computed(() => visiblePhotos.value.filter((_, index) => index % 2 === 0))
 			const rightPhotos = computed(() => visiblePhotos.value.filter((_, index) => index % 2 === 1))
-			const hasMore = computed(() => visibleCount.value < allPhotos.length)
+			const hasMore = computed(() => visibleCount.value < sourcePhotos.length)
 			const visibleCountText = computed(() => formatPhotoNumber(visibleCount.value))
-			const totalCountText = computed(() => formatPhotoNumber(allPhotos.length))
+			const totalCountText = computed(() => formatPhotoNumber(sourcePhotos.length))
 
 			const showToast = (title) => {
 				if (typeof uni === 'undefined' || typeof uni.showToast !== 'function') return
@@ -86,6 +98,86 @@
 					title,
 					icon: 'none'
 				})
+			}
+
+			const compressAvatarFile = (filePath) => new Promise((resolve) => {
+				if (typeof wx === 'undefined' || typeof wx.compressImage !== 'function') {
+					resolve(filePath)
+					return
+				}
+
+				wx.compressImage({
+					src: filePath,
+					quality: 72,
+					success: ({
+						tempFilePath
+					}) => resolve(tempFilePath || filePath),
+					fail: () => resolve(filePath)
+				})
+			})
+
+			const readAvatarAsDataUrl = async (source) => {
+				const filePath = String(source || '').trim()
+				if (!filePath) throw new Error('Missing avatar file.')
+				if (filePath.startsWith('data:image/')) return filePath
+
+				const compressedPath = await compressAvatarFile(filePath)
+				if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') {
+					return compressedPath
+				}
+
+				return new Promise((resolve, reject) => {
+					wx.getFileSystemManager().readFile({
+						filePath: compressedPath,
+						encoding: 'base64',
+						success: ({
+							data
+						}) => resolve(`data:image/jpeg;base64,${data}`),
+						fail: reject
+					})
+				})
+			}
+
+			const persistAuthorizedProfile = async (profile) => {
+				try {
+					const avatarDataUrl = await readAvatarAsDataUrl(profile.avatarUrl)
+					return await cacheVisitorProfile({
+						nickname: profile.nickname,
+						avatarUrl: avatarDataUrl
+					})
+				} catch (error) {
+					console.warn('[album] avatar persistence failed, falling back to raw path', error)
+					try {
+						return await cacheVisitorProfile(profile)
+					} catch (fallbackError) {
+						console.warn('[album] raw profile persistence failed', fallbackError)
+						return profile
+					}
+				}
+			}
+
+			const trackAlbumVisit = (profile) => {
+				if (albumVisitTracked.value) return
+				albumVisitTracked.value = true
+				void recordInvitationShow({
+					page: 'album',
+					scene: 'album-button',
+					profile
+				}).catch(() => {})
+			}
+
+			const trackCachedAlbumVisit = () => {
+				if (albumVisitTracked.value) return
+				const cachedProfile = getCachedVisitorProfile()
+				if (!cachedProfile) return
+				trackAlbumVisit(cachedProfile)
+			}
+
+			const handleAuthorizedProfile = async (profile) => {
+				if (albumVisitTracked.value || !profile) return
+				const cachedProfile = await persistAuthorizedProfile(profile)
+				if (albumVisitTracked.value) return
+				trackAlbumVisit(cachedProfile)
 			}
 
 			const preloadPreviewUrls = async () => {
@@ -102,7 +194,7 @@
 				if (!hasMore.value || isAppending.value) return
 				isAppending.value = true
 				loadingTimer = setTimeout(() => {
-					visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, allPhotos.length)
+					visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, sourcePhotos.length)
 					isAppending.value = false
 					loadingTimer = null
 				}, 260)
@@ -116,7 +208,7 @@
 
 				const urls = await preloadPreviewUrls()
 				const photoIndex = Number(photo && photo.index) > 0 ? Number(photo.index) - 1 : 0
-				const current = urls[photoIndex] || photo.src
+				const current = urls[photoIndex] || (sourcePhotos[photoIndex] && sourcePhotos[photoIndex].src) || photo.src
 				uni.previewImage({
 					current,
 					urls: urls.length ? urls : previewUrls,
@@ -135,6 +227,23 @@
 			const getRevealStyle = (photo) => `animation-delay: ${Math.min((photo.index - 1) % BATCH_SIZE, 7) * 45}ms;`
 
 			onLoad(() => {
+				const eventChannel = instance && instance.proxy && typeof instance.proxy.getOpenerEventChannel === 'function'
+					? instance.proxy.getOpenerEventChannel()
+					: null
+
+				if (eventChannel) {
+					const handleProfileReady = (profile) => {
+						void handleAuthorizedProfile(profile)
+					}
+
+					if (typeof eventChannel.once === 'function') {
+						eventChannel.once('album-profile-ready', handleProfileReady)
+					} else if (typeof eventChannel.on === 'function') {
+						eventChannel.on('album-profile-ready', handleProfileReady)
+					}
+				}
+
+				trackCachedAlbumVisit()
 				void preloadPreviewUrls()
 			})
 			onReachBottom(loadMorePhotos)

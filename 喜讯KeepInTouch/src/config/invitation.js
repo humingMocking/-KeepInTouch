@@ -1,4 +1,8 @@
-const mainWeddingPhoto = '/static/invitation/wedding-photo.jpg'
+const mainWeddingPhoto = 'https://gitee.com/hu-minglt/image-storage/raw/master/album/38.jpg'
+// Replace this root if the album image host changes.
+const albumCloudFileRoot = 'https://gitee.com/hu-minglt/image-storage/raw/master/album/'
+
+const buildAlbumCloudFileId = (fileName) => `${albumCloudFileRoot}${fileName}`
 
 const albumPhotoOrder = [
   '10.jpg',
@@ -42,7 +46,7 @@ const albumPhotoOrder = [
 const albumItems = albumPhotoOrder.map((fileName, index) => ({
   id: `album-photo-${index + 1}`,
   index: index + 1,
-  src: `/static/album/${fileName}`,
+  src: buildAlbumCloudFileId(fileName),
   alt: `相册照片 ${index + 1}`
 }))
 

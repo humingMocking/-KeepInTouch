@@ -5,7 +5,7 @@
 			<view class="envelope-trigger" hover-class="envelope-pressed" hover-stay-time="80">
 				<image class="cover-envelope" src="/static/invitation/cover-envelope.png" mode="scaleToFill" />
 				<view class="cover-letter-card">
-					<image class="cover-letter-photo" src="/static/invitation/cover-letter.jpg" mode="aspectFill" />
+					<image class="cover-letter-photo" src="https://gitee.com/hu-minglt/image-storage/raw/master/album/38.jpg" mode="aspectFill" />
 				</view>
 				<image class="cover-envelope-front" src="/static/invitation/cover-envelope-front.png"
 					mode="scaleToFill" />
@@ -117,7 +117,7 @@
 						<text>愿您永远被爱和快乐包围</text>
 						<text>好久不见 我们婚礼见</text>
 					</view>
-					<view class="album-button" hover-class="album-button-pressed" hover-stay-time="80" @tap="openAlbum">
+					<view class="album-button" hover-class="album-button-pressed" @tap="openAlbum">
 						<image class="album-button-icon" src="/static/icon/kissing.png" />
 						<text class="album-button-text">查看相册</text>
 						<text class="album-button-arrow">›</text>
@@ -157,9 +157,7 @@
 		resolvePreviewImageSrc
 	} from '../../src/utils/previewImage'
 	import {
-		cacheVisitorProfile,
-		getCachedVisitorProfile,
-		recordInvitationShow
+		getCachedVisitorProfile
 	} from '../../src/services/visitor'
 	import {
 		useBackgroundAudio
@@ -197,27 +195,39 @@
 				destroy
 			} = useBackgroundAudio(invitationConfig.audio)
 			const invitationPhotoUrl = invitationConfig.album.cover || '/static/invitation/wedding-photo.jpg'
-			const trackAlbumVisit = (profile) => {
-				void recordInvitationShow({
-					page: 'album',
-					scene: 'album-button',
-					profile
-				}).catch(() => {})
-			}
-			const openAlbumPage = () => {
+
+			const openAlbumPage = (profile) => {
 				showProfilePrompt.value = false
-				uni.navigateTo({
-					url: '/pages/album/album'
-				})
+				const navigationOptions = {
+					url: '/pages/album/album',
+					success: (navigationResult) => {
+						if (
+							!profile ||
+							!navigationResult ||
+							!navigationResult.eventChannel ||
+							typeof navigationResult.eventChannel.emit !== 'function'
+						) {
+							return
+						}
+
+						navigationResult.eventChannel.emit('album-profile-ready', profile)
+					},
+					fail: () => {
+						showProfilePrompt.value = true
+						profileError.value = '打开相册失败，请重试'
+					},
+					complete: () => {
+						profileRequesting.value = false
+					}
+				}
+
+				uni.navigateTo(navigationOptions)
 			}
 			const openAlbum = () => {
 				if (profileRequesting.value) return
 				const cachedProfile = getCachedVisitorProfile()
 				if (cachedProfile) {
 					openAlbumPage()
-					setTimeout(() => {
-						trackAlbumVisit(cachedProfile)
-					}, 0)
 					return
 				}
 
@@ -278,55 +288,21 @@
 				profileError.value = ''
 			}
 
-			const compressAvatarFile = (filePath) => new Promise((resolve) => {
-				if (typeof wx === 'undefined' || typeof wx.compressImage !== 'function') {
-					resolve(filePath)
+			const confirmProfile = () => {
+				if (profileRequesting.value) return
+
+				const trimmedNickname = nickname.value.trim()
+				const trimmedAvatarUrl = avatarUrl.value.trim()
+				if (!trimmedAvatarUrl || !trimmedNickname || trimmedNickname === '微信用户') {
+					profileError.value = '请选择头像并填写你的昵称'
 					return
 				}
 
-				wx.compressImage({
-					src: filePath,
-					quality: 72,
-					success: ({
-						tempFilePath
-					}) => resolve(tempFilePath || filePath),
-					fail: () => resolve(filePath)
+				profileRequesting.value = true
+				openAlbumPage({
+					nickname: trimmedNickname,
+					avatarUrl: trimmedAvatarUrl
 				})
-			})
-
-			const readAvatarAsDataUrl = async (source) => {
-				const filePath = String(source || '').trim()
-				if (!filePath) throw new Error('Missing avatar file.')
-				if (filePath.startsWith('data:image/')) return filePath
-
-				const compressedPath = await compressAvatarFile(filePath)
-				if (typeof wx === 'undefined' || typeof wx.getFileSystemManager !== 'function') {
-					return compressedPath
-				}
-
-				return new Promise((resolve, reject) => {
-					wx.getFileSystemManager().readFile({
-						filePath: compressedPath,
-						encoding: 'base64',
-						success: ({
-							data
-						}) => resolve(`data:image/jpeg;base64,${data}`),
-						fail: reject
-					})
-				})
-			}
-
-			const persistAuthorizedProfile = async (profile) => {
-				try {
-					const avatarDataUrl = await readAvatarAsDataUrl(profile.avatarUrl)
-					return await cacheVisitorProfile({
-						nickname: profile.nickname,
-						avatarUrl: avatarDataUrl
-					})
-				} catch (error) {
-					console.warn('[confirmProfile] avatar persistence failed, falling back to raw path', error)
-					return cacheVisitorProfile(profile)
-				}
 			}
 
 			const enableWechatShareMenu = () => {
@@ -433,37 +409,6 @@
 					opened.value = true
 					opening.value = false
 				}, 650)
-			}
-
-			const confirmProfile = () => {
-				if (profileRequesting.value) return
-
-				const trimmedNickname = nickname.value.trim()
-				const trimmedAvatarUrl = avatarUrl.value.trim()
-				if (!trimmedAvatarUrl || !trimmedNickname || trimmedNickname === '微信用户') {
-					profileError.value = '请选择头像并填写你的昵称'
-					return
-				}
-
-				profileRequesting.value = true
-				const profile = {
-					nickname: trimmedNickname,
-					avatarUrl: trimmedAvatarUrl
-				}
-				openAlbumPage()
-				setTimeout(() => {
-					void persistAuthorizedProfile(profile)
-						.then((cachedProfile) => {
-							trackAlbumVisit(cachedProfile)
-						})
-						.catch((error) => {
-							console.warn('[confirmProfile] background profile persistence failed', error)
-							trackAlbumVisit(profile)
-						})
-						.finally(() => {
-							profileRequesting.value = false
-						})
-				}, 0)
 			}
 
 			const requestOpen = async () => {
