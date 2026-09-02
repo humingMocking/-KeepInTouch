@@ -193,6 +193,7 @@
 			const albumPhotoUrls = (invitationConfig.album.items || [])
 				.map((photo) => photo.src)
 				.filter(Boolean)
+			const openingVoiceUrl = invitationConfig.audio && invitationConfig.audio.opening
 			let albumCacheTimer = null
 			let albumCacheStarted = false
 
@@ -351,6 +352,37 @@
 				openMapLocation(venue)
 			}
 
+			const getOpeningAudio = () => {
+				if (!openingVoiceUrl || typeof getApp !== 'function') {
+					console.log('[opening-audio] global audio unavailable', {
+						hasUrl: Boolean(openingVoiceUrl),
+						hasGetApp: typeof getApp === 'function'
+					})
+					return null
+				}
+
+				const app = getApp()
+				return (app && (app.globalAudio ||
+					(app.globalData && app.globalData.openingAudio))) || null
+			}
+
+			const playOpeningVoice = () => {
+				const audio = getOpeningAudio()
+				if (!audio) return
+
+				console.log('[opening-audio] request play', openingVoiceUrl)
+				try {
+					const playResult = audio.play()
+					if (playResult && typeof playResult.catch === 'function') {
+						playResult.catch((error) => {
+							console.error('[opening-audio] play rejected', error)
+						})
+					}
+				} catch (error) {
+					console.error('[opening-audio] play threw', error)
+				}
+			}
+
 			const openInvitation = () => {
 				opening.value = true
 				setTimeout(() => {
@@ -361,6 +393,8 @@
 
 			const requestOpen = () => {
 				if (opening.value) return
+				console.log('[opening-audio] requestOpen')
+				playOpeningVoice()
 				openInvitation()
 			}
 
@@ -1205,6 +1239,7 @@
 		height: 88rpx;
 		margin: 72rpx auto 0;
 		box-sizing: border-box;
+		font-size: 38rpx;
 	}
 
 	
@@ -1219,7 +1254,7 @@
 	.album-button-text {
 		color: #8f334a;
 		font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-		font-size: 28rpx;
+		font-size: 34rpx;
 		font-weight: 400;
 		letter-spacing: 3rpx;
 		line-height: 1;

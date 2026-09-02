@@ -52,6 +52,7 @@ const albumItems = albumPhotoOrder.map((fileName, index) => ({
 
 export const invitationConfig = {
   share: { title: '囍|我们结婚啦', path: '/pages/index/index?share=wechat&v=20260828', imageUrl: '/static/invitation/share-card.jpg' },
+  audio: { opening: 'https://hangzhou7.zos.ctyun.cn/pi-robot/processTemplate/1788335584893.mp3' },
   album: { title: '我们的相册', cover: mainWeddingPhoto, items: albumItems },
   venues: {
     ceremony: {
