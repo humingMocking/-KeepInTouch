@@ -42,28 +42,30 @@
 	</view>
 </template>
 
-	<script>
-		import {
-			computed,
-			getCurrentInstance,
-			ref
-		} from 'vue'
-		import {
-			onLoad,
-			onReachBottom,
-			onUnload
-		} from '@dcloudio/uni-app'
-		import {
-			invitationConfig
-		} from '../../src/config/invitation'
-		import {
-			resolvePreviewImageUrls
-		} from '../../src/utils/previewImage'
-		import {
-			cacheVisitorProfile,
-			getCachedVisitorProfile,
-			recordInvitationShow
-		} from '../../src/services/visitor'
+<script>
+	import {
+		computed,
+		getCurrentInstance,
+		ref
+	} from 'vue'
+	import {
+		onLoad,
+		onReachBottom,
+		onUnload
+	} from '@dcloudio/uni-app'
+	import {
+		invitationConfig
+	} from '../../src/config/invitation'
+	import {
+		getCachedPreviewImageSrc,
+		preloadPreviewImageSrc,
+		preloadPreviewImageUrlsInOrder
+	} from '../../src/utils/previewImage'
+	import {
+		cacheVisitorProfile,
+		getCachedVisitorProfile,
+		recordInvitationShow
+	} from '../../src/services/visitor'
 
 	const INITIAL_BATCH_SIZE = 10
 	const BATCH_SIZE = 8
@@ -76,13 +78,14 @@
 			const albumVisitTracked = ref(false)
 			const sourcePhotos = invitationConfig.album.items || []
 			const previewUrls = sourcePhotos.map((photo) => photo.src)
-			const resolvedPreviewUrls = ref([])
+			const resolvedPreviewUrls = ref(previewUrls.map((src) => getCachedPreviewImageSrc(src) || src))
 			const resolvedPhotos = computed(() => sourcePhotos.map((photo, index) => ({
 				...photo,
-				src: resolvedPreviewUrls.value[index] || ''
+				src: resolvedPreviewUrls.value[index] || photo.src
 			})))
 			const visibleCount = ref(Math.min(INITIAL_BATCH_SIZE, sourcePhotos.length))
 			let loadingTimer = null
+			let albumPreloadStarted = false
 
 			const formatPhotoNumber = (index) => index < 10 ? `0${index}` : String(index)
 			const visiblePhotos = computed(() => resolvedPhotos.value.slice(0, visibleCount.value))
@@ -180,47 +183,103 @@
 				trackAlbumVisit(cachedProfile)
 			}
 
-			const preloadPreviewUrls = async () => {
-				if (resolvedPreviewUrls.value.length === previewUrls.length && previewUrls.length > 0) {
-					return resolvedPreviewUrls.value
+			const updateResolvedPreviewUrl = (src, index) => {
+				const resolvedSrc = String(src || '').trim()
+				if (!resolvedSrc || resolvedPreviewUrls.value[index] === resolvedSrc) return
+
+				const urls = resolvedPreviewUrls.value.slice()
+				urls[index] = resolvedSrc
+				resolvedPreviewUrls.value = urls
+			}
+
+			const syncCachedPreviewUrls = (start = 0, end = previewUrls.length) => {
+				const fromIndex = Math.max(0, Math.min(Number(start) || 0, previewUrls.length))
+				const toIndex = Math.max(fromIndex, Math.min(Number(end) || previewUrls.length, previewUrls.length))
+				const urls = resolvedPreviewUrls.value.slice()
+				let hasUpdate = false
+
+				for (let index = fromIndex; index < toIndex; index += 1) {
+					const cachedSrc = getCachedPreviewImageSrc(previewUrls[index])
+					if (cachedSrc && urls[index] !== cachedSrc) {
+						urls[index] = cachedSrc
+						hasUpdate = true
+					}
 				}
 
-				const urls = await resolvePreviewImageUrls(previewUrls)
-				resolvedPreviewUrls.value = urls
+				if (hasUpdate) resolvedPreviewUrls.value = urls
 				return urls
+					.map((src, index) => src || previewUrls[index])
+					.filter(Boolean)
+			}
+
+			const primeAlbumPhotos = () => {
+				if (albumPreloadStarted || !previewUrls.length) return
+				albumPreloadStarted = true
+				syncCachedPreviewUrls(0, previewUrls.length)
+				void preloadPreviewImageUrlsInOrder(previewUrls, {
+					onResolved: updateResolvedPreviewUrl
+				}).catch(() => {})
+			}
+
+			const getPreviewUrlsSnapshot = () => {
+				const urls = resolvedPreviewUrls.value.slice()
+				let hasUpdate = false
+
+				previewUrls.forEach((src, index) => {
+					const cachedSrc = getCachedPreviewImageSrc(src)
+					const resolvedSrc = cachedSrc || urls[index] || src
+					if (urls[index] !== resolvedSrc) {
+						urls[index] = resolvedSrc
+						hasUpdate = true
+					}
+				})
+
+				if (hasUpdate) resolvedPreviewUrls.value = urls
+				return urls.filter(Boolean)
 			}
 
 			const loadMorePhotos = () => {
 				if (!hasMore.value || isAppending.value) return
+				const previousCount = visibleCount.value
+				const nextCount = Math.min(previousCount + BATCH_SIZE, sourcePhotos.length)
 				isAppending.value = true
+				visibleCount.value = nextCount
+				syncCachedPreviewUrls(previousCount, nextCount)
+
+				if (loadingTimer) clearTimeout(loadingTimer)
 				loadingTimer = setTimeout(() => {
-					visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, sourcePhotos.length)
 					isAppending.value = false
 					loadingTimer = null
-				}, 260)
+				}, 120)
 			}
 
-			const previewPhoto = async (photo) => {
+			const previewPhoto = (photo) => {
 				if (typeof uni === 'undefined' || typeof uni.previewImage !== 'function') {
 					showToast('当前环境无法预览图片')
 					return
 				}
 
-				const urls = await preloadPreviewUrls()
 				const photoIndex = Number(photo && photo.index) > 0 ? Number(photo.index) - 1 : 0
-				const current = urls[photoIndex] || (sourcePhotos[photoIndex] && sourcePhotos[photoIndex].src) || photo.src
+				const sourceSrc = (sourcePhotos[photoIndex] && sourcePhotos[photoIndex].src) || photo.src
+				const cachedCurrent = getCachedPreviewImageSrc(sourceSrc)
+				if (cachedCurrent) updateResolvedPreviewUrl(cachedCurrent, photoIndex)
+
+				const urls = getPreviewUrlsSnapshot()
+				const current = cachedCurrent || urls[photoIndex] || sourceSrc || photo.src
+				if (current && urls[photoIndex] !== current) urls[photoIndex] = current
 				uni.previewImage({
 					current,
 					urls: urls.length ? urls : previewUrls,
 					fail: () => showToast('图片预览失败，请重试')
 				})
+
+				void preloadPreviewImageSrc(sourceSrc)
+					.then((src) => updateResolvedPreviewUrl(src, photoIndex))
+					.catch(() => {})
 			}
 
 			const markImageLoaded = (id) => {
-				loadedImageIds.value = {
-					...loadedImageIds.value,
-					[id]: true
-				}
+				loadedImageIds.value[id] = true
 			}
 
 			const isImageLoaded = (id) => Boolean(loadedImageIds.value[id])
@@ -244,7 +303,7 @@
 				}
 
 				trackCachedAlbumVisit()
-				void preloadPreviewUrls()
+				primeAlbumPhotos()
 			})
 			onReachBottom(loadMorePhotos)
 			onUnload(() => {

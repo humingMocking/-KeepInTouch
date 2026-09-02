@@ -66,14 +66,14 @@
 							class="venue-label">仪式: </text>
 						<view class="venue-link venue-link-with-icon" @tap.stop="openVenueLocation('ceremony')"><text
 								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>山行有约庄园</text></view>
-						<text class="venue-time">2026年10月28日 14:28</text>
+						<text class="venue-time">2026年10月6日 14:28</text>
 					</view>
 					<view class="rule-row venue-row">
 						<image class="rule-table" src="/static/icon/table.png" mode="scaleToFill" /><text
 							class="venue-label">晚宴: </text>
 						<view class="venue-link venue-link-with-icon" @tap.stop="openVenueLocation('dinner')"><text
 								class="iconfont icon-ditu_dingwei venue-link-icon"></text><text>城投景澜酒店</text></view>
-						<text class="venue-time">2026年10月28日 17:38</text>
+						<text class="venue-time">2026年10月6日 17:38</text>
 					</view>
 
 					<text class="script-heading align-left process-title">Wedding Process</text>
@@ -84,7 +84,7 @@
 						</view>
 						<view class="timeline-stop timeline-stop-arrival">
 							<view class="timeline-time"><text class="timeline-en">Guest Arrival</text><text
-									class="timeline-hour">14:28~15:28</text></view>
+									class="timeline-hour">13:38~14:28</text></view>
 							<view class="timeline-event"><text>签到合影</text>
 								<image class="timeline-event-icon" src="/static/icon/camera-fill.png"
 									mode="aspectFit" />
@@ -92,14 +92,14 @@
 						</view>
 						<view class="timeline-stop timeline-stop-ceremony">
 							<view class="timeline-time"><text class="timeline-en">Ceremony</text><text
-									class="timeline-hour">15:28~16:38</text></view>
+									class="timeline-hour">14:28~16:38</text></view>
 							<view class="timeline-event"><text>草坪仪式</text>
 								<image class="timeline-event-icon" src="/static/icon/rings.png" mode="aspectFit" />
 							</view>
 						</view>
 						<view class="timeline-stop timeline-stop-dinner">
 							<view class="timeline-time"><text class="timeline-en">Dinner</text><text
-									class="timeline-hour">17:38~20:38</text></view>
+									class="timeline-hour">17:38~21:38</text></view>
 							<view class="timeline-event"><text>晚宴用餐</text>
 								<image class="timeline-event-icon" src="/static/icon/cup.png" mode="aspectFit" />
 							</view>
@@ -110,7 +110,7 @@
 					<view class="tips">
 						<text>1. 如果你身在不同的城市或因繁忙的工作无法到达现场没有关系，我们已经收到祝福～</text>
 						<text>2. 如果你有时间，请准备好你的好心情和好胃口，开开心心地来赴约吧～</text>
-						<text>3. 婚礼设有PhotoBooth，欢迎大家积极与我们合影哦～</text>
+						<text>3. 婚礼架设PhotoBooth，欢迎大家积极与我们合影哦～</text>
 					</view>
 					<image class="party-illustration" src="/static/icon/party.png" mode="widthFix" />
 					<view class="closing">
@@ -154,14 +154,12 @@
 		invitationConfig
 	} from '../../src/config/invitation'
 	import {
-		resolvePreviewImageSrc
+		preloadPreviewImageSrc,
+		preloadPreviewImageUrlsInOrder
 	} from '../../src/utils/previewImage'
 	import {
 		getCachedVisitorProfile
 	} from '../../src/services/visitor'
-	import {
-		useBackgroundAudio
-	} from '../../src/composables/useBackgroundAudio'
 
 
 	const getInvitationShareQuery = () => {
@@ -180,6 +178,8 @@
 		return shareMessage
 	}
 
+	const ALBUM_CACHE_DELAY = 800
+
 	export default {
 		setup() {
 			const opened = ref(false)
@@ -189,14 +189,33 @@
 			const profileRequesting = ref(false)
 			const avatarUrl = ref('')
 			const nickname = ref('')
-			const {
-				playing,
-				toggle,
-				destroy
-			} = useBackgroundAudio(invitationConfig.audio)
 			const invitationPhotoUrl = invitationConfig.album.cover || '/static/invitation/wedding-photo.jpg'
+			const albumPhotoUrls = (invitationConfig.album.items || [])
+				.map((photo) => photo.src)
+				.filter(Boolean)
+			let albumCacheTimer = null
+			let albumCacheStarted = false
+
+			const warmAlbumImageCache = () => {
+				if (albumCacheStarted || !albumPhotoUrls.length) return
+				albumCacheStarted = true
+				void preloadPreviewImageUrlsInOrder(albumPhotoUrls).catch(() => {})
+			}
+
+			const scheduleAlbumImageCache = () => {
+				if (albumCacheStarted || albumCacheTimer) return
+				albumCacheTimer = setTimeout(() => {
+					albumCacheTimer = null
+					warmAlbumImageCache()
+				}, ALBUM_CACHE_DELAY)
+			}
 
 			const openAlbumPage = (profile) => {
+				if (albumCacheTimer) {
+					clearTimeout(albumCacheTimer)
+					albumCacheTimer = null
+				}
+				warmAlbumImageCache()
 				showProfilePrompt.value = false
 				const navigationOptions = {
 					url: '/pages/album/album',
@@ -225,6 +244,12 @@
 			}
 			const openAlbum = () => {
 				if (profileRequesting.value) return
+				if (albumCacheTimer) {
+					clearTimeout(albumCacheTimer)
+					albumCacheTimer = null
+				}
+				warmAlbumImageCache()
+
 				const cachedProfile = getCachedVisitorProfile()
 				if (cachedProfile) {
 					openAlbumPage()
@@ -236,20 +261,6 @@
 				nickname.value = ''
 				showProfilePrompt.value = true
 			}
-			const mapProviders = [{
-					key: 'amap',
-					label: '高德地图'
-				},
-				{
-					key: 'baidu',
-					label: '百度地图'
-				},
-				{
-					key: 'tencent',
-					label: '腾讯地图'
-				}
-			]
-
 			const showToast = (title) => {
 				if (typeof uni === 'undefined' || typeof uni.showToast !== 'function') return
 				uni.showToast({
@@ -264,7 +275,7 @@
 					return
 				}
 
-				const resolvedInvitationPhotoUrl = await resolvePreviewImageSrc(invitationPhotoUrl)
+				const resolvedInvitationPhotoUrl = await preloadPreviewImageSrc(invitationPhotoUrl)
 				uni.previewImage({
 					current: resolvedInvitationPhotoUrl,
 					urls: [resolvedInvitationPhotoUrl],
@@ -314,8 +325,6 @@
 				})
 			}
 
-			const encodeMapParam = (value) => encodeURIComponent(value || '')
-
 			const openMapLocation = (venue) => {
 				if (typeof uni === 'undefined' || typeof uni.openLocation !== 'function') {
 					showToast('当前环境无法打开地图')
@@ -332,48 +341,6 @@
 				})
 			}
 
-			const getExternalMapUrl = (venue, providerKey) => {
-				const name = encodeMapParam(venue.mapName || venue.name)
-				const source = encodeMapParam('喜讯KeepInTouch')
-				const latitude = Number(venue.latitude)
-				const longitude = Number(venue.longitude)
-				const isIos = typeof plus !== 'undefined' && plus.os && plus.os.name === 'iOS'
-
-				if (providerKey === 'amap') {
-					const scheme = isIos ? 'iosamap://path?' : 'androidamap://route/plan/?'
-					return `${scheme}sourceApplication=${source}&dlat=${latitude}&dlon=${longitude}&dname=${name}&dev=0&t=0`
-				}
-
-				if (providerKey === 'baidu') {
-					return `baidumap://map/direction?destination=latlng:${latitude},${longitude}|name:${name}&mode=driving&coord_type=gcj02&src=webapp.keepintouch.invitation`
-				}
-
-				if (providerKey === 'tencent') {
-					return `qqmap://map/routeplan?type=drive&tocoord=${latitude},${longitude}&to=${name}&referer=${source}`
-				}
-
-				return ''
-			}
-
-			const openSelectedMap = (venue, providerKey) => {
-				if (
-					typeof plus !== 'undefined' &&
-					plus.runtime &&
-					typeof plus.runtime.openURL === 'function'
-				) {
-					const mapUrl = getExternalMapUrl(venue, providerKey)
-					if (mapUrl) {
-						plus.runtime.openURL(mapUrl, () => {
-							showToast('未安装对应地图，已打开腾讯地图')
-							openMapLocation(venue)
-						})
-						return
-					}
-				}
-
-				openMapLocation(venue)
-			}
-
 			const openVenueLocation = (key) => {
 				const venue = invitationConfig.venues[key]
 				if (!venue) {
@@ -381,26 +348,7 @@
 					return
 				}
 
-				if (typeof uni === 'undefined' || typeof uni.showActionSheet !== 'function') {
-					openMapLocation(venue)
-					return
-				}
-
-				uni.showActionSheet({
-					itemList: mapProviders.map((provider) => provider.label),
-					itemColor: '#9f3f53',
-					success: ({
-						tapIndex
-					}) => {
-						const provider = mapProviders[tapIndex]
-						if (provider) openSelectedMap(venue, provider.key)
-					},
-					fail: (error) => {
-						if (error && !String(error.errMsg || '').includes('cancel')) {
-							showToast('地图选择失败，请重试')
-						}
-					}
-				})
+				openMapLocation(venue)
 			}
 
 			const openInvitation = () => {
@@ -411,21 +359,25 @@
 				}, 650)
 			}
 
-			const requestOpen = async () => {
+			const requestOpen = () => {
 				if (opening.value) return
 				openInvitation()
 			}
 
 			onShow(() => {
 				enableWechatShareMenu()
+				scheduleAlbumImageCache()
 			})
 			onUnload(() => {
-				destroy()
+				if (albumCacheTimer) {
+					clearTimeout(albumCacheTimer)
+					albumCacheTimer = null
+				}
 			})
 			return {
+				config: invitationConfig,
 				opened,
 				opening,
-				playing,
 				invitationPhotoUrl,
 				requestOpen,
 				previewInvitationPhoto,
@@ -439,7 +391,6 @@
 				onNicknameInput,
 				confirmProfile,
 				openVenueLocation,
-				toggleAudio: toggle,
 				openAlbum
 			}
 		},
