@@ -433,7 +433,7 @@
 		},
 		onShareAppMessage(res) {
 			const shareMessage = {
-				title: '囍|我们结婚啦',
+				title: '囍 | 我们结婚啦❤️',
 				path: '/pages/index/index?share=wechat&v=20260828',
 				imageUrl: '/static/invitation/share-card.jpg'
 			}
@@ -1257,10 +1257,6 @@
 		box-sizing: border-box;
 	}
 
-	.album-button-pressed {
-		transform: translateY(1rpx);
-		background: rgba(255, 241, 235, 0.9);
-	}
 
 	.album-button-icon {
 		flex: 0 0 56rpx;
