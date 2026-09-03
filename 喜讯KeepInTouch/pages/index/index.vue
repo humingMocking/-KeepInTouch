@@ -111,16 +111,19 @@
 						<text>1. 如果你身在不同的城市或因繁忙的工作无法到达现场没有关系，我们已经收到祝福～</text>
 						<text>2. 如果你有时间，请准备好你的好心情和好胃口，开开心心地来赴约吧～</text>
 						<text>3. 婚礼架设PhotoBooth，欢迎大家积极与我们合影哦～</text>
+						<view class="tips-album-line">
+							<text class="tips-album-copy">4. 珍贵的瞬间，想与各位一起分享</text>
+							<view class="album-button" hover-class="album-button-pressed" @tap="openAlbum">
+								<image class="album-button-icon" src="/static/icon/kissing.png" />
+								<text class="album-button-text">查看相册</text>
+								<text class="album-button-arrow">›</text>
+							</view>
+						</view>
 					</view>
 					<image class="party-illustration" src="/static/icon/party.png" mode="widthFix" />
 					<view class="closing">
 						<text>愿您永远被爱和快乐包围</text>
 						<text>好久不见 我们婚礼见</text>
-					</view>
-					<view class="album-button" hover-class="album-button-pressed" @tap="openAlbum">
-						<image class="album-button-icon" src="/static/icon/kissing.png" />
-						<text class="album-button-text">查看相册</text>
-						<text class="album-button-arrow">›</text>
 					</view>
 				</view>
 			</view>
@@ -841,9 +844,9 @@
 		gap: 28rpx;
 		margin-top: 52rpx;
 		color: #292722;
-		font-size: 28rpx;
+		font-size: 32rpx;
 		letter-spacing: 4rpx;
-		font-weight: 300;
+		font-weight: 400;
 	}
 
 	.name-heart {
@@ -1197,9 +1200,21 @@
 		line-height: 2.15;
 	}
 
-	.tips text {
+	.tips > text {
 		display: block;
 		margin-bottom: 28rpx;
+	}
+
+	.tips-album-line {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10rpx;
+		margin-bottom: 28rpx;
+	}
+
+	.tips-album-copy {
+		line-height: 2.15;
 	}
 
 	.party-illustration {
@@ -1233,38 +1248,41 @@
 	.album-button {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		gap: 14rpx;
-		width: 306rpx;
-		height: 88rpx;
-		margin: 72rpx auto 0;
+		justify-content: flex-start;
+		gap: 4rpx;
+		width: auto;
+		min-height: 56rpx;
+		margin: -16rpx;
+		padding: 0 14rpx 0 0;
 		box-sizing: border-box;
-		font-size: 38rpx;
 	}
 
-	
+	.album-button-pressed {
+		transform: translateY(1rpx);
+		background: rgba(255, 241, 235, 0.9);
+	}
 
 	.album-button-icon {
-		flex: 0 0 62rpx;
-		width: 62rpx;
-		height: 62rpx;
-
+		flex: 0 0 56rpx;
+		width: 56rpx;
+		height: 56rpx;
 	}
 
 	.album-button-text {
-		color: #8f334a;
+		color: #9f3f53;
 		font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-		font-size: 34rpx;
-		font-weight: 400;
-		letter-spacing: 3rpx;
-		line-height: 1;
-		margin-left: -14rpx;
+		font-size: 30rpx;
+		font-weight: 500;
+		letter-spacing: 1rpx;
+		line-height: 1.35;
+		white-space: nowrap;
+		border-bottom: 1rpx solid rgba(159, 63, 83, .55);
 	}
 
 	.album-button-arrow {
 		color: #8f334a;
 		font-family: 'KeepInTouch IBM Plex Serif', serif;
-		font-size: 34rpx;
+		font-size: 30rpx;
 		font-weight: 700;
 		line-height: 1;
 		transform: translateY(-1rpx);
